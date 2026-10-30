@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Clone Lab</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e2dc;
+    --accent: #c2410c; --accent-ink: #fff; --ok: #15803d; --err: #b91c1c; --soft: #fbf3ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --card: #1d1d20; --ink: #f2f2f3; --muted: #9a9aa2; --line: #2e2e33;
+      --accent: #fb923c; --accent-ink: #1a1a1a; --ok: #4ade80; --err: #f87171; --soft: #2a211c; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Devanagari", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  h2 { font-size: 17px; margin: 0 0 4px; display: flex; gap: 10px; align-items: center; }
+  .step { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    font-size: 13px; display: inline-grid; place-items: center; flex: none; }
+  .hint { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+  .prompt { background: var(--soft); border-radius: 10px; padding: 12px 14px; font-size: 14.5px; margin-bottom: 14px; }
+  .prompt p { margin: 0 0 6px; } .prompt p:last-child { margin: 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  input[type=text], select, textarea { font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; }
+  input[type=text] { flex: 1; min-width: 160px; }
+  textarea { width: 100%; min-height: 90px; resize: vertical; }
+  button { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    border-radius: 9px; padding: 9px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.rec { background: var(--err); color: #fff; border-color: var(--err); }
+  button:disabled { opacity: .5; cursor: default; }
+  label.file { font-weight: 600; border: 1px dashed var(--line); border-radius: 9px; padding: 8px 14px; cursor: pointer; }
+  label.file input { display: none; }
+  audio { width: 100%; margin-top: 8px; }
+  .status { font-size: 13.5px; min-height: 20px; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.err { color: var(--err); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chips button { font-weight: 500; font-size: 13px; padding: 5px 10px; border-radius: 999px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; font-weight: 500; }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .slider { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--muted); }
+  .timer { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 44px; }
+  .out h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 12px 0 0; }
+  details { font-size: 13.5px; color: var(--muted); margin-bottom: 12px; }
+  details input { width: 100%; margin-top: 6px; }
+  .meta { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Voice Clone Lab</h1>
+  <p class="sub">Clone a voice from 10–20 seconds of speech, then make it speak English, Hindi or Marathi. Runs on this computer only.</p>
+
+  <section>
+    <h2><span class="step">1</span>Clone a voice</h2>
+    <p class="hint">Record 10–20 s in a quiet room, mic close to your mouth, natural pace. Read the lines below, or say anything.</p>
+    <!-- keep in sync with ENROLL_SCRIPT in engines.py (transcripts are snapped to these lines) -->
+    <div class="prompt">
+      <p>Hello, today I am recording my voice so that this device can speak like me.</p>
+      <p>नमस्ते, आज मौसम बहुत अच्छा है और मैं अपने दोस्तों के साथ बाज़ार जा रहा हूँ।</p>
+      <p>नमस्कार, मी आज माझा आवाज रेकॉर्ड करत आहे. हा आवाज छान आणि स्पष्ट असावा.</p>
+    </div>
+    <div class="row">
+      <input type="text" id="vname" placeholder="Voice name, e.g. suraj">
+    </div>
+    <div class="row">
+      <button id="recBtn" class="primary">● Record</button>
+      <span class="timer" id="recTimer">0:00</span>
+      <label class="file">or upload audio<input type="file" id="enrollFile" accept="audio/*"></label>
+    </div>
+    <audio id="enrollPreview" controls hidden></audio>
+    <details>
+      <summary>Optional: type exactly what you said (better accuracy)</summary>
+      <input type="text" id="refText" placeholder="Leave empty to auto-transcribe">
+    </details>
+    <div class="row">
+      <button id="enrollBtn" class="primary" disabled>Create voice clone</button>
+    </div>
+    <div class="status" id="enrollStatus"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span>Make it speak</h2>
+    <p class="hint"><b>Best</b> copies voice <i>and</i> accent most closely (slowest). <b>Balanced</b> is about 2× quicker, slightly less close. <b>Fast</b> starts in about half a second but copies tone only. <b>Trained</b> is a small model trained on Best's output: instant, and the one that runs on the device.</p>
+    <div class="row">
+      <select id="voiceSel"><option value="">No voices yet</option></select>
+      <select id="langSel">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी Hindi</option>
+        <option value="mr">मराठी Marathi</option>
+      </select>
+      <button id="playRef" title="Hear the original recording">▶ Original</button>
+    </div>
+    <div class="meta" id="voiceMeta"></div>
+    <div class="row">
+      <div class="seg" id="engineSeg">
+        <button data-v="best" class="on">Best</button>
+        <button data-v="balanced">Balanced</button>
+        <button data-v="fast">Fast</button>
+        <button data-v="trained" id="trainedBtn" title="Your own model trained from Best (see distill/README.md)">Trained</button>
+      </div>
+      <div class="slider" id="tauBox" hidden>Similarity
+        <input type="range" id="tau" min="0.1" max="0.9" step="0.1" value="0.3"><span id="tauVal">0.3</span>
+      </div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <textarea id="text"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="speakBtn" class="primary">Speak in cloned voice</button>
+      <button id="rawBtn" hidden>Compare: stock voice</button>
+    </div>
+    <div class="status" id="speakStatus"></div>
+    <div class="out" id="speakOut"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span>Talk in the cloned voice</h2>
+    <p class="hint">Record yourself saying anything. It comes back in the selected cloned voice, like the mic-to-speaker device.</p>
+    <div class="row">
+      <button id="s2sBtn" class="primary">● Record speech</button>
+      <span class="timer" id="s2sTimer">0:00</span>
+      <label class="file">or upload<input type="file" id="s2sFile" accept="audio/*"></label>
+    </div>
+    <div class="status" id="s2sStatus"></div>
+    <div class="out" id="s2sOut"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const EXAMPLES = {
+  en: ["Hello friend, I am coming at four in the afternoon. Please keep the tea ready.",
+       "Good morning! Your meeting starts in ten minutes.",
+       "Thank you for calling. How can I help you today?"],
+  hi: ["नमस्ते दोस्त, मैं आज दोपहर चार बजे आ रहा हूँ। कृपया चाय तैयार रखना।",
+       "सुप्रभात! आपकी मीटिंग दस मिनट में शुरू होगी।",
+       "आज बहुत गर्मी है, पानी पीते रहना।"],
+  mr: ["नमस्कार मित्रांनो, मी आज दुपारी चार वाजता येतोय. कृपया चहा तयार ठेवा.",
+       "सुप्रभात! तुमची मीटिंग दहा मिनिटांत सुरू होईल.",
+       "आज खूप छान हवा आहे, चला फिरायला जाऊया."],
+};
+let VOICES = [];
+const state = { engine: "best" };
+const ENGINE_LABEL = { best: "Best", balanced: "Balanced", fast: "Fast", trained: "Trained" };
+
+function setStatus(el, msg, kind = "") { el.textContent = msg; el.className = "status " + kind; }
+function seg(id, key, after) {
+  $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
+    $(id).querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    state[key] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v; after && after();
+  });
+}
+seg("engineSeg", "engine", () => {
+  const fast = state.engine === "fast";
+  $("tauBox").hidden = !fast; $("rawBtn").hidden = !fast;
+});
+
+function renderChips() {
+  const lang = $("langSel").value;
+  $("chips").innerHTML = "";
+  EXAMPLES[lang].forEach((t, i) => {
+    const b = document.createElement("button");
+    b.textContent = "Example " + (i + 1);
+    b.onclick = () => $("text").value = t;
+    $("chips").appendChild(b);
+  });
+  $("text").value = EXAMPLES[lang][0];
+}
+$("langSel").onchange = () => { renderChips(); showMeta(); };
+$("tau").oninput = () => $("tauVal").textContent = $("tau").value;
+
+function showMeta() {
+  const v = VOICES.find(x => x.name === $("voiceSel").value);
+  const tr = v && v.trained.length ? ` · trained: ${v.trained.join(", ")}` : "";
+  $("voiceMeta").textContent = v ? `Cloned from ${v.seconds}s · heard: “${v.ref_text}”${tr}` : "";
+  // Trained engine only where a model exists for this voice + language
+  const ok = !!v && v.trained.includes($("langSel").value);
+  $("trainedBtn").disabled = !ok;
+  if (!ok && state.engine === "trained") $("engineSeg").querySelector('[data-v="best"]').click();
+}
+$("voiceSel").onchange = showMeta;
+async function loadVoices(select) {
+  VOICES = await (await fetch("/api/voices")).json();
+  const sel = $("voiceSel");
+  sel.innerHTML = VOICES.length ? VOICES.map(v => `<option>${v.name}</option>`).join("") : '<option value="">No voices yet</option>';
+  if (select) sel.value = select;
+  showMeta();
+}
+
+// Recorder helper: toggles record/stop on a button, returns Blob via callback.
+function makeRecorder(btn, timerEl, idleLabel, onDone) {
+  let rec = null, chunks = [], t0 = 0, iv = null;
+  btn.onclick = async () => {
+    if (rec && rec.state === "recording") { rec.stop(); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
+    catch (e) { alert("Microphone not available here: " + e.message + "\nUse the upload option, or open this page in Chrome/Safari."); return; }
+    chunks = []; rec = new MediaRecorder(stream);
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop()); clearInterval(iv);
+      btn.textContent = idleLabel; btn.className = "primary";
+      onDone(new Blob(chunks, { type: rec.mimeType }), rec.mimeType);
+    };
+    rec.start(); t0 = Date.now();
+    btn.textContent = "■ Stop"; btn.className = "rec";
+    iv = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000);
+      timerEl.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 250);
+  };
+}
+const extFor = mime => mime.includes("ogg") ? ".ogg" : mime.includes("mp4") ? ".m4a" : ".webm";
+const b64blob = b64 => new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: "audio/wav" });
+
+// ---- 1. enroll ----
+let enrollBlob = null, enrollExt = ".webm";
+function setEnroll(blob, ext) {
+  enrollBlob = blob; enrollExt = ext;
+  $("enrollPreview").src = URL.createObjectURL(blob); $("enrollPreview").hidden = false;
+  $("enrollBtn").disabled = false;
+}
+makeRecorder($("recBtn"), $("recTimer"), "● Record", (b, m) => setEnroll(b, extFor(m)));
+$("enrollFile").onchange = e => { const f = e.target.files[0]; if (f) setEnroll(f, "." + f.name.split(".").pop()); };
+
+$("enrollBtn").onclick = async () => {
+  const fd = new FormData();
+  fd.append("name", $("vname").value.trim() || "voice");
+  fd.append("ref_text", $("refText").value);
+  fd.append("audio", enrollBlob, "ref" + enrollExt);
+  $("enrollBtn").disabled = true; setStatus($("enrollStatus"), "Cloning voice (about 10–20 s the first time)…");
+  const r = await fetch("/api/enroll", { method: "POST", body: fd }); const j = await r.json();
+  $("enrollBtn").disabled = false;
+  if (!r.ok) return setStatus($("enrollStatus"), j.error, "err");
+  setStatus($("enrollStatus"), `✓ Voice "${j.name}" ready (${j.seconds}s of audio, ${(j.ms / 1000).toFixed(1)} s). Now try step 2.`, "ok");
+  loadVoices(j.name);
+};
+
+// ---- 2. speak (streamed: each clause plays as soon as it is ready) ----
+let ctx = null;
+async function speak(raw) {
+  const voice = $("voiceSel").value;
+  if (!voice) return setStatus($("speakStatus"), "Clone a voice first (step 1).", "err");
+  ctx = ctx || new AudioContext(); await ctx.resume();
+  $("speakBtn").disabled = true;
+  setStatus($("speakStatus"), "Generating…");
+  const body = { voice, lang: $("langSel").value, text: $("text").value, engine: state.engine,
+                 tau: +$("tau").value, raw };
+  const t0 = performance.now();
+  const r = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { $("speakBtn").disabled = false; return setStatus($("speakStatus"), (await r.json()).error, "err"); }
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", playAt = 0, firstMs = null;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const msg = JSON.parse(buf.slice(0, nl)); buf = buf.slice(nl + 1);
+      if (msg.done) {
+        const label = raw ? "Stock voice" : `${voice} · ${ENGINE_LABEL[body.engine]}`;
+        const info = `${msg.seconds}s audio · first sound ${firstMs} ms · all done ${msg.ms} ms`;
+        const div = document.createElement("div");
+        div.innerHTML = `<h3>${label} · ${$("langSel").selectedOptions[0].text} · ${info}</h3><audio controls src="${URL.createObjectURL(b64blob(msg.audio))}"></audio>`;
+        $("speakOut").prepend(div);
+        setStatus($("speakStatus"), "");
+      } else {
+        if (firstMs === null) firstMs = Math.round(performance.now() - t0);
+        const ab = await ctx.decodeAudioData(await b64blob(msg.audio).arrayBuffer());
+        const src = ctx.createBufferSource(); src.buffer = ab; src.connect(ctx.destination);
+        playAt = Math.max(playAt, ctx.currentTime + 0.02); src.start(playAt); playAt += ab.duration + 0.06;
+        setStatus($("speakStatus"), `Playing… (first sound after ${firstMs} ms, generating the rest)`);
+      }
+    }
+  }
+  $("speakBtn").disabled = false;
+}
+$("speakBtn").onclick = () => speak(false);
+$("rawBtn").onclick = () => speak(true);
+$("playRef").onclick = () => { const v = $("voiceSel").value; if (v) new Audio("/api/sample/" + encodeURIComponent(v)).play(); };
+
+// ---- 3. speech to speech ----
+async function s2s(blob, ext) {
+  const voice = $("voiceSel").value;
+  if (!voice) return setStatus($("s2sStatus"), "Clone a voice first (step 1).", "err");
+  const fd = new FormData(); fd.append("voice", voice); fd.append("tau", $("tau").value); fd.append("audio", blob, "in" + ext);
+  setStatus($("s2sStatus"), "Converting…");
+  const r = await fetch("/api/convert", { method: "POST", body: fd }); const j = await r.json();
+  if (!r.ok) return setStatus($("s2sStatus"), j.error, "err");
+  setStatus($("s2sStatus"), "");
+  const div = document.createElement("div");
+  div.innerHTML = `<h3>As ${voice} · ${j.seconds}s in ${j.ms} ms</h3><audio controls src="${URL.createObjectURL(b64blob(j.audio))}"></audio>
+                   <h3>Your input</h3><audio controls src="${URL.createObjectURL(blob)}"></audio>`;
+  $("s2sOut").prepend(div); div.querySelector("audio").play();
+}
+makeRecorder($("s2sBtn"), $("s2sTimer"), "● Record speech", (b, m) => s2s(b, extFor(m)));
+$("s2sFile").onchange = e => { const f = e.target.files[0]; if (f) s2s(f, "." + f.name.split(".").pop()); };
+
+renderChips(); loadVoices();
+</script>
+</body>
+</html>

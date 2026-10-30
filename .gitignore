@@ -1,0 +1,33 @@
+# Python environments and caches
+.venv*/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+
+# Downloaded repos and models (re-download, see README)
+OpenVoice/
+piper1-gpl/
+piper_voices/
+onnx/
+cache/
+distill/checkpoints/
+
+# Voice recordings, cloned voices and generated audio: personal data, keep off GitHub
+voices/
+dl/
+out/
+out_omni/
+distill/data/
+*.wav
+
+# Training runs and outputs
+distill/runs/
+distill/run_all.log
+distill/colab_*.zip
+*.ckpt
+*.onnx
+*.onnx.json
+*.pt
+*.pth
+*.zip
