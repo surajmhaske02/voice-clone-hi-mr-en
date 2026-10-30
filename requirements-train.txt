@@ -1,0 +1,6 @@
+# Optional: training your own fast voice model (distill/). Separate env: bash setup.sh --train
+piper-tts[train]==1.8.0
+torch==2.8.0
+torchaudio==2.8.0
+huggingface_hub==2.4.0
+Cython==3.3.0
